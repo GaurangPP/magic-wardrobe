@@ -7,6 +7,7 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { CameraView } from '@/features/camera/components/CameraView';
+import { AIService } from '@/services/ai';
 import { ImageService } from '@/services/image';
 import { Link } from 'expo-router';
 import { useState } from 'react';
@@ -17,17 +18,18 @@ export default function HomeScreen() {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [loadingMessage, setLoadingMessage] = useState('Removing background...');
+
   if (showCamera) {
     return (
       <CameraView
         onCapture={async (uri) => {
           console.log('Capturing temp URI:', uri);
           setShowCamera(false);
-          setPreviewUri(uri); // Show original first while processing? Or show loading?
-          // Let's show preview modal with loading state immediately
+          setPreviewUri(uri);
+          setLoadingMessage('Removing background...');
           setIsProcessing(true);
 
-          // Declare savedUri outside try block for fallback accessibility
           let savedUri = uri;
 
           try {
@@ -36,12 +38,10 @@ export default function HomeScreen() {
             console.log('Saved to:', savedUri);
 
             // 2. Remove background
-            // Note: In a real app we might want to do this in the background or let user choose
             const processedUri = await ImageService.removeBackground(savedUri);
             setPreviewUri(processedUri);
           } catch (e) {
             console.error('Failed to process image:', e);
-            // Fallback to original if BG removal fails (e.g. in Expo Go)
             alert('Background removal failed (requires Native Build). Using original image.');
             setPreviewUri(savedUri);
           } finally {
@@ -59,15 +59,32 @@ export default function HomeScreen() {
         visible={true}
         imageUri={previewUri}
         loading={isProcessing}
-        loadingMessage="Removing background..."
+        loadingMessage={loadingMessage}
         onClose={() => {
           setPreviewUri(null);
           setIsProcessing(false);
         }}
-        onConfirm={() => {
-          console.log('Confirmed image:', previewUri);
-          setPreviewUri(null);
-          // Navigate to next screen or add to DB here
+        onConfirm={async () => {
+          try {
+            console.log('Confirmed image:', previewUri);
+            if (!previewUri) return;
+
+            setLoadingMessage('Analyzing Outfit... 🧠');
+            setIsProcessing(true);
+
+            const analysis = await AIService.analyzeImage(previewUri);
+            console.log('AI Analysis Result:', JSON.stringify(analysis, null, 2));
+
+            // Temporary: Show result in alert
+            alert(`Analysis:\n\nCategory: ${analysis.category}\nItem: ${analysis.subCategory}\nColor: ${analysis.primaryColor}`);
+
+            setPreviewUri(null);
+          } catch (error) {
+            console.error('AI Analysis Failed:', error);
+            alert('AI Analysis Failed. Check logs.');
+          } finally {
+            setIsProcessing(false);
+          }
         }}
       />
     );
