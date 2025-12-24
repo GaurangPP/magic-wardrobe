@@ -1,10 +1,10 @@
 export const CLOTHING_CATEGORIES = [
-    'Headwear',   // Renamed from 'Hats' for better AI accuracy
+    'Headwear',
     'Outerwear',
     'Tops',
-    'Bottoms',    // Fixed pluralization
-    'Footwear',   // Renamed from 'Shoes'
-    'Accessories' // Optional: Good for belts/scarves, easy to ignore if unused
+    'Bottoms',
+    'Footwear',
+    'Accessories'
 ] as const;
 
 export const STANDARD_SUBCATEGORIES = {
@@ -53,11 +53,9 @@ export const CLOTHING_TAGS = {
         'Everyday', 'Work', 'Date Night', 'Party', 'Gym',
         'Lounge', 'Beach', 'Travel', 'Formal Event'
     ],
-    // Crucial for Outfit Matching Rules
     fit: [
         'Slim', 'Regular', 'Oversized', 'Cropped', 'Baggy', 'Tailored'
     ],
-    // Crucial for Weather Filtering
     season: [
         'Summer', 'Winter', 'Spring', 'Fall', 'Transitional', 'All-Season'
     ]
