@@ -1,21 +1,35 @@
-import { Image } from 'expo-image';
-import { StyleSheet } from 'react-native';
-
 import { EditItemModal } from '@/components/EditItemModal';
-import { HelloWave } from '@/components/hello-wave';
 import { ImagePreview } from '@/components/ImagePreview';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { CameraView } from '@/features/camera/components/CameraView';
 import { AIService } from '@/services/ai';
 import { ImageService } from '@/services/image';
 import { InventoryService } from '@/services/inventory';
-import { Link } from 'expo-router';
-import { useState } from 'react';
-import { Button } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
+  const router = useRouter();
+
+  // --- State ---
+  const [recentItems, setRecentItems] = useState<any[]>([]);
+  const [loadingRecents, setLoadingRecents] = useState(true);
+
   const [showCamera, setShowCamera] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,68 +39,82 @@ export default function HomeScreen() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  /* Helper: Handle Final Save */
+  // --- Effects ---
+  // Load recent items whenever screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      loadRecents();
+    }, [])
+  );
+
+  const loadRecents = async () => {
+    try {
+      setLoadingRecents(true);
+      const allItems = await InventoryService.getAllItems();
+      // Get top 5 most recent (results are already ordered DESC)
+      setRecentItems(allItems.slice(0, 5));
+    } catch (e) {
+      console.error('Failed to load recents:', e);
+    } finally {
+      setLoadingRecents(false);
+    }
+  };
+
+  // --- Handlers ---
+
   const handleSaveToCloset = async (finalData: any) => {
     try {
       if (!previewUri) return;
 
-      // Keep Modal open but show loading indication if possible, 
-      // or close it and rely on ImagePreview's loading state.
-      // Current behavior: Close Modal -> Show ImagePreview Loading.
       setShowEditModal(false);
       setLoadingMessage('Saving to Closet... 🧠');
       setIsProcessing(true);
 
-      console.log('[HomeScreen] Saving item started...');
-
-      // Artificial delay to allow UI to settle (modal close animation)
+      // Artificial delay to allow UI to settle
       await new Promise(resolve => setTimeout(resolve, 500));
 
       await InventoryService.addItem(previewUri, finalData);
       console.log('[HomeScreen] Item saved to DB.');
 
-      // Reset state first to return to Home
+      // Reset state
       setPreviewUri(null);
       setAnalysisResult(null);
       setIsProcessing(false);
 
-      // Short delay before alert to ensure view has re-rendered
+      // Refresh recents
+      loadRecents();
+
+      // Success feedback
       setTimeout(() => {
-        alert('Success! Item saved to your wardrobe.');
+        Alert.alert('Success', 'Item saved to your wardrobe.');
       }, 500);
 
     } catch (e) {
       console.error('[HomeScreen] Save failed:', e);
       setIsProcessing(false);
-      // If failed, we might want to re-open the modal or just alert.
-      // Since we closed it, the user lost their edits. 
-      // Ideally we shouldn't close the modal until success, but let's stick to this flow for now.
-      alert('Failed to save item. Please try again.');
+      Alert.alert('Failed to save item. Please try again.');
     }
   };
+
+  // --- Render Views ---
 
   if (showCamera) {
     return (
       <CameraView
         onCapture={async (uri) => {
-          console.log('Capturing temp URI:', uri);
           setShowCamera(false);
           setPreviewUri(uri);
           setLoadingMessage('Removing background...');
           setIsProcessing(true);
 
           let savedUri = uri;
-
           try {
-            // 1. Save original
             savedUri = await ImageService.saveImage(uri);
-
-            // 2. Remove background
             const processedUri = await ImageService.removeBackground(savedUri);
             setPreviewUri(processedUri);
           } catch (e) {
             console.error('Failed to process image:', e);
-            alert('Background removal failed. Using original image.');
+            Alert.alert('Background removal failed. Using original image.');
             setPreviewUri(savedUri);
           } finally {
             setIsProcessing(false);
@@ -97,7 +125,6 @@ export default function HomeScreen() {
     );
   }
 
-  // If we have an analysis result and edit flag, show the Edit Modal
   if (showEditModal && analysisResult) {
     return (
       <EditItemModal
@@ -125,23 +152,15 @@ export default function HomeScreen() {
         onConfirm={async () => {
           try {
             if (!previewUri) return;
-
             setLoadingMessage('Analyzing Outfit... 🧠');
             setIsProcessing(true);
 
-            // 3. AI Analysis
             const analysis = await AIService.analyzeImage(previewUri);
-            console.log('AI Analysis Result:', analysis);
-
-            // 4. Open Edit Modal
             setAnalysisResult(analysis);
             setShowEditModal(true);
-
-            // Note: We intentionally keep isProcessing=false here so ImagePreview doesn't show loading
-            // But we are switching to EditModal return block.
           } catch (error) {
             console.error('AI Analysis Failed:', error);
-            alert('AI Analysis Failed. Check logs.');
+            Alert.alert('AI Analysis Failed. Check logs.');
           } finally {
             setIsProcessing(false);
           }
@@ -150,83 +169,260 @@ export default function HomeScreen() {
     );
   }
 
+  // --- Main Dashboard ---
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title" className="text-red-500 font-bold">Magic Wardrobe</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Setup Complete!</ThemedText>
-        <ThemedText>
-          Database initialized and Tailwind configured.
-        </ThemedText>
-        <Button title="Open Camera" onPress={() => setShowCamera(true)} />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Good Afternoon,</Text>
+          <Text style={styles.title}>Magic Wardrobe</Text>
+        </View>
+        <TouchableOpacity style={styles.settingsButton}>
+          <Ionicons name="settings-outline" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+
+        {/* Hero / Action Section */}
+        <TouchableOpacity
+          style={styles.heroCard}
+          onPress={() => setShowCamera(true)}
+          activeOpacity={0.9}
+        >
+          <View style={styles.heroContent}>
+            <View style={styles.heroIconContainer}>
+              <Ionicons name="camera" size={32} color="#fff" />
+            </View>
+            <View>
+              <Text style={styles.heroTitle}>Scan New Item</Text>
+              <Text style={styles.heroSubtitle}>Digitize your closet with AI</Text>
+            </View>
+          </View>
+          <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.8)" />
+        </TouchableOpacity>
+
+        {/* Secondary Actions Grid */}
+        <View style={styles.gridContainer}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/explore')}>
+            <View style={[styles.iconCircle, { backgroundColor: '#e0f2fe' }]}>
+              <Ionicons name="shirt-outline" size={24} color="#0284c7" />
+            </View>
+            <Text style={styles.actionText}>My Closet</Text>
+            <Text style={styles.actionCount}>{recentItems.length > 0 ? 'View All' : 'Empty'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => Alert.alert('Coming Soon', 'Outfit suggestions coming soon!')}>
+            <View style={[styles.iconCircle, { backgroundColor: '#f3e8ff' }]}>
+              <Ionicons name="sparkles-outline" size={24} color="#9333ea" />
+            </View>
+            <Text style={styles.actionText}>Ask AI</Text>
+            <Text style={styles.actionCount}>Get Ideas</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Recent Items Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recently Added</Text>
+          {recentItems.length > 0 && (
+            <TouchableOpacity onPress={() => router.push('/(tabs)/explore')}>
+              <Text style={styles.seeAll}>See All</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loadingRecents ? (
+          <ActivityIndicator style={{ marginTop: 20 }} color="#000" />
+        ) : recentItems.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.recentScroll}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+          >
+            {recentItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.recentItem}
+                onPress={() => router.push('/(tabs)/explore')} // Just go to closet for now, or could open details
+              >
+                <Image source={{ uri: item.image_uri }} style={styles.recentImage} />
+                <View style={styles.recentOverlay} />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.emptyRecent}>
+            <Text style={styles.emptyText}>No items yet. Start scanning!</Text>
+          </View>
+        )}
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  greeting: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  settingsButton: {
+    padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  heroCard: {
+    marginHorizontal: 20,
+    backgroundColor: '#111',
+    borderRadius: 24,
+    padding: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 24,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  heroIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 16,
+    marginBottom: 32,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    // shadowColor: '#000',
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.05,
+    // shadowRadius: 4,
+    // elevation: 2,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 4,
+  },
+  actionCount: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
+  },
+  seeAll: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  recentScroll: {
+    paddingLeft: 4, // Compensation for container padding
+  },
+  recentItem: {
+    width: 140,
+    height: 180,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#f5f5f5',
+    position: 'relative',
+  },
+  recentImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  recentOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.02)', // Subtle darken
+  },
+  emptyRecent: {
+    marginHorizontal: 20,
+    padding: 30,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 16,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  emptyText: {
+    color: '#999',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
