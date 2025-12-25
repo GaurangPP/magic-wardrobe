@@ -15,11 +15,19 @@ export const initDB = async () => {
             CREATE TABLE IF NOT EXISTS clothing_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 image_uri TEXT NOT NULL,
-                metadata TEXT, -- JSON string for analyzed data (color, style, etc.)
+                metadata TEXT, -- JSON string for analyzed data
+                embedding TEXT, -- JSON string for vector embedding
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
         `);
+
+        // Migration: Ensure embedding column exists for existing tables
+        try {
+            await db.execAsync('ALTER TABLE clothing_items ADD COLUMN embedding TEXT;');
+        } catch (e) {
+            // Column likely already exists, ignore
+        }
 
         // Create outfits table
         await db.execAsync(`

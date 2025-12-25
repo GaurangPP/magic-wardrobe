@@ -9,35 +9,42 @@ export const CLOTHING_CATEGORIES = [
 
 export const STANDARD_SUBCATEGORIES = {
     Headwear: [
-        'Baseball Cap', 'Beanie', 'Bucket Hat', 'Fedora', 'Sun Hat', 'Visor', 'Headband'
+        'Cap', 'Beanie', 'Bucket Hat', 'Fedora', 'Sun Hat', 'Visor', 'Headband'
     ],
     Outerwear: [
         'Bomber Jacket', 'Blazer', 'Cardigan', 'Peacoat', 'Denim Jacket',
-        'Hoodie', 'Leather Jacket', 'Parka', 'Raincoat', 'Vest',
+        'Zip-Up Hoodie', 'Varsity Jacket', 'Leather Jacket', 'Parka', 'Raincoat', 'Vest',
         'Windbreaker', 'Puffer Jacket', 'Trench Coat'
     ],
     Tops: [
         'T-Shirt', 'Button-Down', 'Polo', 'Tank Top', 'Sweater',
-        'Sweatshirt', 'Crop Top', 'Bodysuit', 'Jersey', 'Tunic'
+        'Sweatshirt', 'Hoodie', 'Quarter Zip', 'Jersey', 
     ],
     Bottoms: [
-        'Jeans', 'Trousers', 'Chinos', 'Shorts', 'Skirt',
-        'Leggings', 'Sweatpants', 'Cargo Pants', 'Joggers'
+        'Jeans', 'Trousers', 'Chinos', 'Shorts', 'Sweatpants',
+        'Cargo Pants', 'Joggers', 'Pajamas'
     ],
     Footwear: [
         'Sneakers', 'Boots', 'Loafers', 'Oxfords', 'Sandals',
-        'Heels', 'Flats', 'Slippers', 'Slides'
+        'Slippers', 'Slides'
     ],
     Accessories: [
-        'Belt', 'Scarf', 'Gloves', 'Bag', 'Sunglasses', 'Tie'
+        'Belt', 'Necklace', 'Watch', 'Ring', 'Bracelet', 'Scarf',
+        'Gloves', 'Bag', 'Sunglasses', 'Tie'
     ]
 };
 
 export const CLOTHING_TAGS = {
     styles: [
-        'Casual', 'Smart Casual', 'Formal', 'Business', 'Streetwear',
-        'Minimalist', 'Athleisure', 'Vintage', 'Bohemian', 'Preppy',
-        'Grunge', 'Edgy', 'Y2K'
+        'Casual', 'Smart Casual', 'Formal', 'Streetwear',
+        'Athleisure',  'Minimalist', 'Rugged'
+    ],
+    occasions: [
+        'Everyday', 'Home', 'Work', 'Date', 'Party', 'Gym',
+        'Formal', 'Beach', 'Travel',
+    ],
+    fit: [
+        'Slim', 'Regular', 'Oversized', 'Cropped', 'Baggy', 'Tailored'
     ],
     materials: [
         'Cotton', 'Denim', 'Leather', 'Wool', 'Linen', 'Silk',
@@ -49,15 +56,8 @@ export const CLOTHING_TAGS = {
         'Camouflage', 'Polka Dot', 'Animal Print', 'Checkered',
         'Tie-Dye', 'Geometric', 'Paisley'
     ],
-    occasions: [
-        'Everyday', 'Work', 'Date Night', 'Party', 'Gym',
-        'Lounge', 'Beach', 'Travel', 'Formal Event'
-    ],
-    fit: [
-        'Slim', 'Regular', 'Oversized', 'Cropped', 'Baggy', 'Tailored'
-    ],
     season: [
-        'Summer', 'Winter', 'Spring', 'Fall', 'Transitional', 'All-Season'
+        'Summer', 'Winter', 'Spring', 'Fall', 'All-Season'
     ]
 } as const;
 

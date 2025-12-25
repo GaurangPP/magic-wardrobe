@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native';
 
+import { EditItemModal } from '@/components/EditItemModal';
 import { HelloWave } from '@/components/hello-wave';
 import { ImagePreview } from '@/components/ImagePreview';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
@@ -9,6 +10,7 @@ import { ThemedView } from '@/components/themed-view';
 import { CameraView } from '@/features/camera/components/CameraView';
 import { AIService } from '@/services/ai';
 import { ImageService } from '@/services/image';
+import { InventoryService } from '@/services/inventory';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Button } from 'react-native';
@@ -17,8 +19,51 @@ export default function HomeScreen() {
   const [showCamera, setShowCamera] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-
   const [loadingMessage, setLoadingMessage] = useState('Removing background...');
+
+  // Edit Flow State
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  /* Helper: Handle Final Save */
+  const handleSaveToCloset = async (finalData: any) => {
+    try {
+      if (!previewUri) return;
+
+      // Keep Modal open but show loading indication if possible, 
+      // or close it and rely on ImagePreview's loading state.
+      // Current behavior: Close Modal -> Show ImagePreview Loading.
+      setShowEditModal(false);
+      setLoadingMessage('Saving to Closet... 🧠');
+      setIsProcessing(true);
+
+      console.log('[HomeScreen] Saving item started...');
+
+      // Artificial delay to allow UI to settle (modal close animation)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      await InventoryService.addItem(previewUri, finalData);
+      console.log('[HomeScreen] Item saved to DB.');
+
+      // Reset state first to return to Home
+      setPreviewUri(null);
+      setAnalysisResult(null);
+      setIsProcessing(false);
+
+      // Short delay before alert to ensure view has re-rendered
+      setTimeout(() => {
+        alert('Success! Item saved to your wardrobe.');
+      }, 500);
+
+    } catch (e) {
+      console.error('[HomeScreen] Save failed:', e);
+      setIsProcessing(false);
+      // If failed, we might want to re-open the modal or just alert.
+      // Since we closed it, the user lost their edits. 
+      // Ideally we shouldn't close the modal until success, but let's stick to this flow for now.
+      alert('Failed to save item. Please try again.');
+    }
+  };
 
   if (showCamera) {
     return (
@@ -35,20 +80,32 @@ export default function HomeScreen() {
           try {
             // 1. Save original
             savedUri = await ImageService.saveImage(uri);
-            console.log('Saved to:', savedUri);
 
             // 2. Remove background
             const processedUri = await ImageService.removeBackground(savedUri);
             setPreviewUri(processedUri);
           } catch (e) {
             console.error('Failed to process image:', e);
-            alert('Background removal failed (requires Native Build). Using original image.');
+            alert('Background removal failed. Using original image.');
             setPreviewUri(savedUri);
           } finally {
             setIsProcessing(false);
           }
         }}
         onClose={() => setShowCamera(false)}
+      />
+    );
+  }
+
+  // If we have an analysis result and edit flag, show the Edit Modal
+  if (showEditModal && analysisResult) {
+    return (
+      <EditItemModal
+        visible={true}
+        initialData={analysisResult}
+        imageUri={previewUri}
+        onSave={handleSaveToCloset}
+        onCancel={() => setShowEditModal(false)}
       />
     );
   }
@@ -63,22 +120,25 @@ export default function HomeScreen() {
         onClose={() => {
           setPreviewUri(null);
           setIsProcessing(false);
+          setAnalysisResult(null);
         }}
         onConfirm={async () => {
           try {
-            console.log('Confirmed image:', previewUri);
             if (!previewUri) return;
 
             setLoadingMessage('Analyzing Outfit... 🧠');
             setIsProcessing(true);
 
+            // 3. AI Analysis
             const analysis = await AIService.analyzeImage(previewUri);
-            console.log('AI Analysis Result:', JSON.stringify(analysis, null, 2));
+            console.log('AI Analysis Result:', analysis);
 
-            // Temporary: Show result in alert
-            alert(`Analysis:\n\nCategory: ${analysis.category}\nItem: ${analysis.subCategory}\nColor: ${analysis.primaryColor}`);
+            // 4. Open Edit Modal
+            setAnalysisResult(analysis);
+            setShowEditModal(true);
 
-            setPreviewUri(null);
+            // Note: We intentionally keep isProcessing=false here so ImagePreview doesn't show loading
+            // But we are switching to EditModal return block.
           } catch (error) {
             console.error('AI Analysis Failed:', error);
             alert('AI Analysis Failed. Check logs.');

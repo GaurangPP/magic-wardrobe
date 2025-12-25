@@ -17,3 +17,11 @@ export interface AIProvider {
      */
     analyzeImage(imageUri: string): Promise<ClothingAnalysis>;
 }
+
+export interface EmbeddingProvider {
+    /**
+     * Generates a vector embedding for semantic search.
+     * @param text The text to embed.
+     */
+    generateEmbedding(text: string): Promise<number[]>;
+}

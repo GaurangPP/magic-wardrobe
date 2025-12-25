@@ -1,112 +1,269 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { EditItemModal } from '@/components/EditItemModal';
+import { ItemCard } from '@/components/ItemCard';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { CLOTHING_CATEGORIES } from '@/services/ai/prompts';
+import { ClothingAnalysis } from '@/services/ai/types';
+import { InventoryService } from '@/services/inventory';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function TabTwoScreen() {
+export default function ClosetScreen() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Organization State
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+
+  // Edit/Detail State
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const loadItems = async () => {
+    try {
+      if (!refreshing) setLoading(true);
+      const inventory = await InventoryService.getAllItems();
+      setItems(inventory);
+    } catch (error) {
+      console.error('Failed to load inventory:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadItems();
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadItems();
+  };
+
+  // Filter Items based on Active Category
+  const filteredItems = useMemo(() => {
+    if (activeCategory === 'All') return items;
+    return items.filter(item => item.metadata.category === activeCategory);
+  }, [items, activeCategory]);
+
+  /* Update Item Handler with "No Change" Check */
+  const handleUpdateItem = async (updatedData: ClothingAnalysis) => {
+    if (!selectedItem) return;
+
+    try {
+      // Deep comparison to check if anything actually changed
+      const hasChanged = JSON.stringify(selectedItem.metadata) !== JSON.stringify(updatedData);
+
+      if (!hasChanged) {
+        setModalVisible(false);
+        return; // Exit early, no DB update needed
+      }
+
+      setLoading(true);
+      await InventoryService.updateItem(selectedItem.id, updatedData);
+      setModalVisible(false);
+      await loadItems(); // Reload to reflect changes
+      Alert.alert('Success', 'Item updated successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update item');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteItem = () => {
+    if (!selectedItem) return;
+
+    Alert.alert(
+      "Delete Item",
+      "Are you sure you want to remove this item from your closet? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              setModalVisible(false); // Close modal first
+              await InventoryService.deleteItem(selectedItem.id, selectedItem.image_uri);
+              await loadItems();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete item');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const openItemDetails = (item: any) => {
+    setSelectedItem(item);
+    setModalVisible(true);
+  };
+
+  // Category Filter Component
+  const renderFilterBar = () => (
+    <View style={styles.filterContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+        <TouchableOpacity
+          style={[styles.filterChip, activeCategory === 'All' && styles.filterChipActive]}
+          onPress={() => setActiveCategory('All')}
+        >
+          <Text style={[styles.filterText, activeCategory === 'All' && styles.filterTextActive]}>All</Text>
+        </TouchableOpacity>
+
+        {CLOTHING_CATEGORIES.map(cat => (
+          <TouchableOpacity
+            key={cat}
+            style={[styles.filterChip, activeCategory === cat && styles.filterChipActive]}
+            onPress={() => setActiveCategory(cat)}
+          >
+            <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive]}>{cat}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  if (loading && !refreshing && items.length === 0) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <ThemedText type="title">My Closet</ThemedText>
+        <Text style={styles.count}>{filteredItems.length} items</Text>
+      </View>
+
+      {renderFilterBar()}
+
+      <FlatList
+        data={filteredItems}
+        renderItem={({ item }) => (
+          <ItemCard
+            item={item}
+            onPress={() => openItemDetails(item)}
+          />
+        )}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        contentContainerStyle={styles.list}
+        columnWrapperStyle={styles.columnWrapper}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              {activeCategory === 'All' ? 'Your wardrobe is empty.' : `No items found in ${activeCategory}.`}
+            </Text>
+            {activeCategory === 'All' && <Text style={styles.emptySubText}>Scan an item to get started!</Text>}
+          </View>
+        }
+      />
+
+      {/* Edit/Detail Modal */}
+      {selectedItem && (
+        <EditItemModal
+          visible={modalVisible}
+          initialData={selectedItem.metadata}
+          imageUri={selectedItem.image_uri}
+          isReadOnly={true} // Start in Read-Only mode
+          onSave={handleUpdateItem}
+          onDelete={handleDeleteItem}
+          onCancel={() => setModalVisible(false)}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  titleContainer: {
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  count: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  filterContainer: {
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
     gap: 8,
   },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterChipActive: {
+    backgroundColor: '#000',
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  filterTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  list: {
+    padding: 10,
+    paddingBottom: 100, // Space for tab bar
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    marginTop: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#888',
+  }
 });

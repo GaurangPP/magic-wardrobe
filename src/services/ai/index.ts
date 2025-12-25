@@ -1,19 +1,30 @@
 import { OpenAIProvider } from './providers/OpenAIProvider';
-import { AIProvider, ClothingAnalysis } from './types';
+import { VoyageProvider } from './providers/VoyageProvider';
+import { AIProvider, ClothingAnalysis, EmbeddingProvider } from './types';
 
 class AIServiceInstance {
-    private provider: AIProvider;
+    private visionProvider: AIProvider;
+    private embeddingProvider: EmbeddingProvider;
 
     constructor() {
-        this.provider = new OpenAIProvider();
+        this.visionProvider = new OpenAIProvider();
+        this.embeddingProvider = new VoyageProvider();
     }
 
-    public setProvider(provider: AIProvider) {
-        this.provider = provider;
+    public setVisionProvider(provider: AIProvider) {
+        this.visionProvider = provider;
+    }
+
+    public setEmbeddingProvider(provider: EmbeddingProvider) {
+        this.embeddingProvider = provider;
     }
 
     public async analyzeImage(imageUri: string): Promise<ClothingAnalysis> {
-        return this.provider.analyzeImage(imageUri);
+        return this.visionProvider.analyzeImage(imageUri);
+    }
+
+    public async generateEmbedding(text: string): Promise<number[]> {
+        return this.embeddingProvider.generateEmbedding(text);
     }
 }
 
