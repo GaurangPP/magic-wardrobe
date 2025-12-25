@@ -48,6 +48,7 @@ export default function ClosetScreen() {
   // Filter Items based on Active Category
   const filteredItems = useMemo(() => {
     if (activeCategory === 'All') return items;
+    if (activeCategory === 'Laundry') return items.filter(item => !item.is_clean);
     return items.filter(item => item.metadata.category === activeCategory);
   }, [items, activeCategory]);
 
@@ -104,6 +105,66 @@ export default function ClosetScreen() {
     );
   };
 
+  /* Laundry Handlers */
+  const handleWearItem = async () => {
+    if (!selectedItem) return;
+    try {
+      await InventoryService.markAsWorn(selectedItem.id);
+      // Reload and update selected item state to reflect changes
+      const updatedInventory = await InventoryService.getAllItems();
+      setItems(updatedInventory);
+      const updatedItem = updatedInventory.find(i => i.id === selectedItem.id);
+      if (updatedItem) setSelectedItem(updatedItem);
+    } catch (e) {
+      console.error('Failed to mark as worn:', e);
+      Alert.alert('Error', 'Failed to update status');
+    }
+  };
+
+  const handleWashItem = async () => {
+    if (!selectedItem) return;
+    try {
+      await InventoryService.markAsClean(selectedItem.id);
+      // Reload and update selected item state
+      const updatedInventory = await InventoryService.getAllItems();
+      setItems(updatedInventory);
+      const updatedItem = updatedInventory.find(i => i.id === selectedItem.id);
+      if (updatedItem) setSelectedItem(updatedItem);
+    } catch (e) {
+      console.error('Failed to wash item:', e);
+      Alert.alert('Error', 'Failed to update status');
+    }
+  };
+
+  const handleDecrementWear = async () => {
+    if (!selectedItem) return;
+    try {
+      await InventoryService.decrementWear(selectedItem.id);
+
+      const updatedInventory = await InventoryService.getAllItems();
+      setItems(updatedInventory);
+      const updatedItem = updatedInventory.find(i => i.id === selectedItem.id);
+      if (updatedItem) setSelectedItem(updatedItem);
+    } catch (e) {
+      console.error('Failed to decrement wear:', e);
+    }
+  };
+
+  const handleMarkDirty = async () => {
+    if (!selectedItem) return;
+    try {
+      await InventoryService.markAsDirty(selectedItem.id);
+
+      const updatedInventory = await InventoryService.getAllItems();
+      setItems(updatedInventory);
+      const updatedItem = updatedInventory.find(i => i.id === selectedItem.id);
+      if (updatedItem) setSelectedItem(updatedItem);
+    } catch (e) {
+      console.error('Failed to mark as dirty:', e);
+      Alert.alert('Error', 'Failed to update status');
+    }
+  };
+
   const openItemDetails = (item: any) => {
     setSelectedItem(item);
     setModalVisible(true);
@@ -120,6 +181,13 @@ export default function ClosetScreen() {
           <Text style={[styles.filterText, activeCategory === 'All' && styles.filterTextActive]}>All</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.filterChip, activeCategory === 'Laundry' && styles.filterChipActive]}
+          onPress={() => setActiveCategory('Laundry')}
+        >
+          <Text style={[styles.filterText, activeCategory === 'Laundry' && styles.filterTextActive]}>Laundry</Text>
+        </TouchableOpacity>
+
         {CLOTHING_CATEGORIES.map(cat => (
           <TouchableOpacity
             key={cat}
@@ -130,7 +198,7 @@ export default function ClosetScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-    </View>
+    </View >
   );
 
   if (loading && !refreshing && items.length === 0) {
@@ -181,7 +249,14 @@ export default function ClosetScreen() {
           visible={modalVisible}
           initialData={selectedItem.metadata}
           imageUri={selectedItem.image_uri}
-          isReadOnly={true} // Start in Read-Only mode
+          isReadOnly={true}
+
+          itemData={selectedItem}
+          onWear={handleWearItem}
+          onDecrementWear={handleDecrementWear}
+          onWash={handleWashItem}
+          onMarkDirty={handleMarkDirty}
+
           onSave={handleUpdateItem}
           onDelete={handleDeleteItem}
           onCancel={() => setModalVisible(false)}

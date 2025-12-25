@@ -22,11 +22,21 @@ export const initDB = async () => {
             );
         `);
 
-        // Migration: Ensure embedding column exists for existing tables
-        try {
-            await db.execAsync('ALTER TABLE clothing_items ADD COLUMN embedding TEXT;');
-        } catch (e) {
-            // Column likely already exists, ignore
+        // Migration: Ensure new columns exist
+        const migrations = [
+            'ALTER TABLE clothing_items ADD COLUMN embedding TEXT;',
+            'ALTER TABLE clothing_items ADD COLUMN wear_count INTEGER DEFAULT 0;',
+            'ALTER TABLE clothing_items ADD COLUMN max_wears INTEGER DEFAULT 5;',
+            'ALTER TABLE clothing_items ADD COLUMN is_clean BOOLEAN DEFAULT 1;',
+            'ALTER TABLE clothing_items ADD COLUMN last_worn INTEGER;'
+        ];
+
+        for (const query of migrations) {
+            try {
+                await db.execAsync(query);
+            } catch (e) {
+                // Column likely already exists, ignore
+            }
         }
 
         // Create outfits table

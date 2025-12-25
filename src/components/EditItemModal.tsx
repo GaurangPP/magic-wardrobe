@@ -71,6 +71,34 @@ const AnimatedChip = ({ label, isSelected, onPress, isSmall = false }: ChipProps
 }
 
 // ------------------------------------------------------------------
+// Helper: Animated Button for scale press effect
+// ------------------------------------------------------------------
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const AnimatedButton = ({ onPress, style, children, disabled }: { onPress?: () => void, style?: any, children: React.ReactNode, disabled?: boolean }) => {
+    const pressed = useSharedValue(0);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ scale: withTiming(pressed.value ? 0.95 : 1, { duration: 100 }) }],
+            opacity: withTiming(pressed.value || disabled ? 0.7 : 1, { duration: 100 })
+        };
+    });
+
+    return (
+        <AnimatedPressable
+            onPress={onPress}
+            onPressIn={() => { if (!disabled) pressed.value = 1; }}
+            onPressOut={() => { if (!disabled) pressed.value = 0; }}
+            disabled={disabled}
+            style={[style, animatedStyle]}
+        >
+            {children}
+        </AnimatedPressable>
+    );
+};
+
+// ------------------------------------------------------------------
 
 interface EditItemModalProps {
     visible: boolean;
@@ -78,6 +106,17 @@ interface EditItemModalProps {
     onSave: (data: ClothingAnalysis) => void;
     onDelete?: () => void;
     onCancel: () => void;
+    // Laundry Props
+    itemData?: {
+        wear_count: number;
+        max_wears: number | null;
+        is_clean: boolean;
+    } | null;
+    onWear?: () => void;
+    onDecrementWear?: () => void;
+    onWash?: () => void;
+    onMarkDirty?: () => void;
+
     isReadOnly?: boolean;
     imageUri?: string | null;
 }
@@ -88,6 +127,11 @@ export const EditItemModal = ({
     onSave,
     onDelete,
     onCancel,
+    itemData,
+    onWear,
+    onDecrementWear,
+    onWash,
+    onMarkDirty,
     isReadOnly = false,
     imageUri
 }: EditItemModalProps) => {
@@ -161,6 +205,58 @@ export const EditItemModal = ({
                                     style={styles.imagePreview}
                                     contentFit="cover"
                                 />
+                            </View>
+                        )}
+
+                        {/* Laundry Status (Read Only Only) */}
+                        {isReadOnly && itemData && (
+                            <View style={styles.laundryContainer}>
+                                <View style={styles.laundryInfo}>
+                                    <View style={[styles.statusBadge, { backgroundColor: itemData.is_clean ? '#dcfce7' : '#fee2e2' }]}>
+                                        <Text style={[styles.statusText, { color: itemData.is_clean ? '#166534' : '#991b1b' }]}>
+                                            {itemData.is_clean ? 'Clean' : 'Needs Wash'}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.wearCount}>
+                                        Worn: {itemData.wear_count} / {itemData.max_wears === null ? '∞' : itemData.max_wears}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.laundryActions}>
+                                    {/* Decrement Button */}
+                                    <AnimatedButton
+                                        style={[styles.laundryBtn, { backgroundColor: '#f3f4f6', flex: 0.5 }]}
+                                        onPress={onDecrementWear}
+                                        disabled={itemData.wear_count <= 0}
+                                    >
+                                        <Ionicons name="remove" size={24} color={itemData.wear_count > 0 ? "#000" : "#ccc"} />
+                                    </AnimatedButton>
+
+                                    {/* Increment Button */}
+                                    <AnimatedButton
+                                        style={[styles.laundryBtn, { backgroundColor: '#f3f4f6', flex: 0.5 }]}
+                                        onPress={onWear}
+                                    >
+                                        <Ionicons name="add" size={24} color="#000" />
+                                    </AnimatedButton>
+
+                                    {/* Status Toggle */}
+                                    {itemData.is_clean ? (
+                                        <AnimatedButton
+                                            style={[styles.laundryBtn, { backgroundColor: '#fff7ed' }]}
+                                            onPress={onMarkDirty}
+                                        >
+                                            <Text style={[styles.laundryBtnText, { color: '#c2410c' }]}>Mark Dirty</Text>
+                                        </AnimatedButton>
+                                    ) : (
+                                        <AnimatedButton
+                                            style={[styles.laundryBtn, { backgroundColor: '#eff6ff' }]}
+                                            onPress={onWash}
+                                        >
+                                            <Text style={[styles.laundryBtnText, { color: '#1d4ed8' }]}>Wash</Text>
+                                        </AnimatedButton>
+                                    )}
+                                </View>
                             </View>
                         )}
 
@@ -271,7 +367,7 @@ export const EditItemModal = ({
                     )}
                 </View>
             </View>
-        </Modal>
+        </Modal >
     );
 };
 
@@ -449,5 +545,79 @@ const styles = StyleSheet.create({
     imagePreview: {
         width: '100%',
         height: '100%',
+    },
+    // Laundry Styles
+    laundryContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+    },
+    laundryInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    statusText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    wearCount: {
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    laundryActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    laundryBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    laundryBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#111',
+    },
+    wearControls: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+    },
+    wearLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#111',
+    },
+    wearButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    iconBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    dividerVertical: {
+        width: 1,
+        height: 16,
+        backgroundColor: '#ddd',
+        marginHorizontal: 4,
     },
 });

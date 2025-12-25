@@ -18,7 +18,7 @@ export const STANDARD_SUBCATEGORIES = {
     ],
     Tops: [
         'T-Shirt', 'Button-Down', 'Polo', 'Tank Top', 'Sweater',
-        'Sweatshirt', 'Hoodie', 'Quarter Zip', 'Jersey', 
+        'Sweatshirt', 'Hoodie', 'Quarter Zip', 'Jersey',
     ],
     Bottoms: [
         'Jeans', 'Trousers', 'Chinos', 'Shorts', 'Sweatpants',
@@ -34,10 +34,83 @@ export const STANDARD_SUBCATEGORIES = {
     ]
 };
 
+// null = Infinity (Doesn't need washing / Specialist Clean Only)
+type SubCategoryLimits = Record<string, number | null>;
+
+export const CLOTHING_WEAR_LIMITS: Record<string, SubCategoryLimits> = {
+    Headwear: {
+        'Cap': 14,
+        'Beanie': 7,
+        'Bucket Hat': 14,
+        'Fedora': null,
+        'Sun Hat': null,
+        'Visor': 14,
+        'Headband': 2,
+    },
+    Outerwear: {
+        'Bomber Jacket': 10,
+        'Blazer': 5,
+        'Cardigan': 5,
+        'Peacoat': null,
+        'Denim Jacket': 20,
+        'Zip-Up Hoodie': 5,
+        'Varsity Jacket': 10,
+        'Leather Jacket': null,
+        'Parka': null,
+        'Raincoat': null,
+        'Vest': 10,
+        'Windbreaker': 10,
+        'Puffer Jacket': null,
+        'Trench Coat': null,
+    },
+    Tops: {
+        'T-Shirt': 1,
+        'Button-Down': 2,
+        'Polo': 2,
+        'Tank Top': 1,
+        'Sweater': 3,
+        'Sweatshirt': 3,
+        'Hoodie': 3,
+        'Quarter Zip': 3,
+        'Jersey': 1,
+    },
+    Bottoms: {
+        'Jeans': 10,
+        'Trousers': 3,
+        'Chinos': 3,
+        'Shorts': 2,
+        'Sweatpants': 3,
+        'Cargo Pants': 5,
+        'Joggers': 2,
+        'Pajamas': 3,
+    },
+    Footwear: {
+        'Sneakers': null,
+        'Boots': null, // Can clean, but not traditionally "washed"
+        'Loafers': null,
+        'Oxfords': null,
+        'Sandals': null,
+        'Slippers': null,
+        'Slides': null,
+    },
+    Accessories: {
+        'Belt': null,
+        'Necklace': null,
+        'Watch': null,
+        'Ring': null,
+        'Bracelet': null,
+        'Scarf': 10,
+        'Gloves': 10,
+        'Bag': null,
+        'Sunglasses': null,
+        'Tie': null,
+    }
+};
+
 export const CLOTHING_TAGS = {
     styles: [
         'Casual', 'Smart Casual', 'Formal', 'Streetwear',
-        'Athleisure',  'Minimalist', 'Rugged'
+        'Athleisure', 'Minimalist', 'Rugged'
     ],
     occasions: [
         'Everyday', 'Home', 'Work', 'Date', 'Party', 'Gym',
