@@ -4,11 +4,11 @@ import { CameraView } from '@/features/camera/components/CameraView';
 import { AIService } from '@/services/ai';
 import { ImageService } from '@/services/image';
 import { InventoryService } from '@/services/inventory';
+import { OutfitService } from '@/services/outfits';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -28,6 +28,7 @@ export default function HomeScreen() {
 
   // --- State ---
   const [recentItems, setRecentItems] = useState<any[]>([]);
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [loadingRecents, setLoadingRecents] = useState(true);
 
   const [showCamera, setShowCamera] = useState(false);
@@ -51,8 +52,11 @@ export default function HomeScreen() {
     try {
       setLoadingRecents(true);
       const allItems = await InventoryService.getAllItems();
-      // Get top 5 most recent (results are already ordered DESC)
+      // Get top 5 most recent
       setRecentItems(allItems.slice(0, 5));
+
+      const history = await OutfitService.getHistory();
+      setHistoryItems(history);
     } catch (e) {
       console.error('Failed to load recents:', e);
     } finally {
@@ -215,50 +219,60 @@ export default function HomeScreen() {
             <Text style={styles.actionCount}>{recentItems.length > 0 ? 'View All' : 'Empty'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => Alert.alert('Coming Soon', 'Outfit suggestions coming soon!')}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/outfits')}>
             <View style={[styles.iconCircle, { backgroundColor: '#f3e8ff' }]}>
               <Ionicons name="sparkles-outline" size={24} color="#9333ea" />
             </View>
-            <Text style={styles.actionText}>Ask AI</Text>
+            <Text style={styles.actionText}>Stylist</Text>
             <Text style={styles.actionCount}>Get Ideas</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Recent Items Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recently Added</Text>
-          {recentItems.length > 0 && (
-            <TouchableOpacity onPress={() => router.push('/(tabs)/explore')}>
-              <Text style={styles.seeAll}>See All</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* History Section */}
+        {recentItems.length > 0 && ( /* Using recentItems as proxy for "has data", but should verify */
+          <View>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Wear History</Text>
+            </View>
 
-        {loadingRecents ? (
-          <ActivityIndicator style={{ marginTop: 20 }} color="#000" />
-        ) : recentItems.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.recentScroll}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-          >
-            {recentItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.recentItem}
-                onPress={() => router.push('/(tabs)/explore')} // Just go to closet for now, or could open details
-              >
-                <Image source={{ uri: item.image_uri }} style={styles.recentImage} />
-                <View style={styles.recentOverlay} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyRecent}>
-            <Text style={styles.emptyText}>No items yet. Start scanning!</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+            >
+              {historyItems.map((outfit: any) => (
+                <View key={outfit.id} style={styles.historyCard}>
+                  <View style={styles.historyDateBadge}>
+                    <Text style={styles.historyDateText}>
+                      {new Date(outfit.date_worn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                  <View style={styles.historyImages}>
+                    {outfit.items.slice(0, 3).map((item: any, index: number) => (
+                      <Image
+                        key={item.id}
+                        source={{ uri: item.image_uri }}
+                        style={[styles.historyThumb, { marginLeft: index > 0 ? -15 : 0, zIndex: 3 - index }]}
+                      />
+                    ))}
+                    {outfit.items.length > 3 && (
+                      <View style={[styles.historyThumb, styles.moreBadge, { marginLeft: -15, zIndex: 0 }]}>
+                        <Text style={styles.moreText}>+{outfit.items.length - 3}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+              {historyItems.length === 0 && (
+                <View style={styles.emptyRecent}>
+                  <Text style={styles.emptyText}>No outfits worn yet.</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         )}
+
+
 
       </ScrollView>
     </SafeAreaView>
@@ -424,5 +438,51 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 15,
     fontWeight: '500',
+  },
+  // History Styles
+  historyCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    minWidth: 140,
+  },
+  historyDateBadge: {
+    backgroundColor: '#f8fafc',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  historyDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  historyImages: {
+    flexDirection: 'row',
+    height: 60,
+    alignItems: 'center',
+    paddingLeft: 8, // For the first overlap offset
+  },
+  historyThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: '#e2e8f0',
+  },
+  moreBadge: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+  },
+  moreText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
   },
 });

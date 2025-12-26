@@ -30,6 +30,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="tshirt.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="outfits"
+        options={{
+          title: 'Stylist',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

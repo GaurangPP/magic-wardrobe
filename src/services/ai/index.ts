@@ -26,6 +26,14 @@ class AIServiceInstance {
     public async generateEmbedding(text: string): Promise<number[]> {
         return this.embeddingProvider.generateEmbedding(text);
     }
+
+    public async generateOutfitDescription(anchor: any, weather: string): Promise<any> {
+        // Safe cast or optional chaining if interface allows
+        if ('generateOutfitDescription' in this.visionProvider) {
+            return (this.visionProvider as any).generateOutfitDescription(anchor, weather);
+        }
+        return {};
+    }
 }
 
 export const AIService = new AIServiceInstance();

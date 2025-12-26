@@ -240,5 +240,77 @@ export const InventoryService = {
             console.error('[InventoryService] Failed to mark as dirty:', error);
             throw error;
         }
+    },
+
+    /**
+     * Searches for items using vector similarity.
+     * @param queryEmbedding The embedding vector to search for.
+     * @param category Optional category to filter by.
+     * @param limit Max results to return (default 10).
+     */
+    searchItems: async (queryEmbedding: number[], category?: string, limit: number = 10): Promise<any[]> => {
+        try {
+            const db = await getDB();
+            let query = 'SELECT * FROM clothing_items';
+            let params: any[] = [];
+
+            if (category) {
+                // We need to filter after fetching because category is in metadata JSON.
+                // OR we can fetch all and filter in JS (simpler for now given small wardrobe size).
+            }
+
+            const result = await db.getAllAsync(query);
+
+            const items = result.map((row: any) => ({
+                ...row,
+                metadata: JSON.parse(row.metadata),
+                embedding: row.embedding ? JSON.parse(row.embedding) : null,
+                wear_count: row.wear_count ?? 0,
+                max_wears: row.max_wears,
+                is_clean: !!row.is_clean,
+                last_worn: row.last_worn
+            })).filter(item => item.embedding !== null);
+
+            // Filter by category if needed AND ensure item is clean
+            const filteredItems = items.filter((item: any) => {
+                const matchesCategory = category ? item.metadata.category === category : true;
+                const isClean = item.is_clean;
+                return matchesCategory && isClean;
+            });
+
+            // Compute Cosine Similarity
+            const scoredItems = filteredItems.map((item: any) => {
+                const similarity = cosineSimilarity(queryEmbedding, item.embedding);
+                return { ...item, similarity };
+            });
+
+            // Sort by similarity DESC
+            scoredItems.sort((a: any, b: any) => b.similarity - a.similarity);
+
+            return scoredItems.slice(0, limit);
+        } catch (error) {
+            console.error('[InventoryService] Search failed:', error);
+            return [];
+        }
     }
+};
+
+// --- Helper Functions ---
+
+const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
+    if (vecA.length !== vecB.length) return 0;
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+
+    if (normA === 0 || normB === 0) return 0;
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 };

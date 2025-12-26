@@ -16,6 +16,19 @@ export interface AIProvider {
      * @param imageUri Local file URI of the image to analyze.
      */
     analyzeImage(imageUri: string): Promise<ClothingAnalysis>;
+
+    /**
+     * Generates descriptions for matching outfit items based on an anchor item and context.
+     * @param anchor The item to build the outfit around.
+     * @param weather Current weather description.
+     */
+    generateOutfitDescription(context: { slots: any, locked: any }, weather: string): Promise<{
+        Headwear?: any;
+        Outerwear?: any;
+        Tops?: any;
+        Bottoms?: any;
+        Footwear?: any;
+    }>;
 }
 
 export interface EmbeddingProvider {
